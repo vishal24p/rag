@@ -1,0 +1,340 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "streamdown/styles.css";
+@import "@fontsource-variable/geist";
+@source "../node_modules/streamdown/dist/*.js";
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: "Geist Variable", "Segoe UI", sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--foreground);
+  --color-popover: var(--card);
+  --color-popover-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--foreground);
+  --color-destructive: #bc3b35;
+  --color-border: var(--border);
+  --color-input: var(--border);
+  --color-ring: #7c7c7c;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+}
+:root {
+  --default-font-family: "Geist Variable", "Segoe UI", sans-serif;
+  --font-sans: "Geist Variable", "Segoe UI", sans-serif;
+
+  font-family: "Geist Variable", "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  --background: #fff;
+  --foreground: #222;
+  --card: #fff;
+  --primary: #252525;
+  --primary-foreground: #fff;
+  --secondary: #f4f4f4;
+  --muted: #f5f5f5;
+  --muted-foreground: #727272;
+  --accent: #eeeeee;
+  --border: #e8e8e8;
+  --radius: 0.75rem;
+  color: var(--foreground);
+  background: var(--background);
+  --sidebar: hsl(0 0% 98%);
+  --sidebar-foreground: hsl(240 5.3% 26.1%);
+  --sidebar-primary: hsl(240 5.9% 10%);
+  --sidebar-primary-foreground: hsl(0 0% 98%);
+  --sidebar-accent: hsl(240 4.8% 95.9%);
+  --sidebar-accent-foreground: hsl(240 5.9% 10%);
+  --sidebar-border: hsl(220 13% 91%);
+  --sidebar-ring: hsl(217.2 91.2% 59.8%);
+}
+
+/* One token system covers the sidebar, overlays and conversation. */
+:root.dark {
+  --background: #181818;
+  --foreground: #eeeeee;
+  --card: #202020;
+  --primary: #eeeeee;
+  --primary-foreground: #181818;
+  --secondary: #282828;
+  --muted: #292929;
+  --muted-foreground: #aaaaaa;
+  --accent: #323232;
+  --border: #363636;
+  --sidebar: #202020;
+  --sidebar-foreground: #eeeeee;
+  --sidebar-primary: #eeeeee;
+  --sidebar-primary-foreground: #181818;
+  --sidebar-accent: #303030;
+  --sidebar-accent-foreground: #eeeeee;
+  --sidebar-border: #363636;
+  --sidebar-ring: #999999;
+}
+* {
+  box-sizing: border-box;
+}
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+}
+body {
+  margin: 0;
+  min-width: 320px;
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: default;
+}
+button:focus-visible {
+  outline: 2px solid #777;
+  outline-offset: 3px;
+}
+.chat-main {
+  display: flex;
+  height: 100dvh;
+  flex-direction: column;
+  overflow: hidden;
+}
+.chat-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 64px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  padding: 0 16px;
+  font-size: 14px;
+}
+.transcript {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.transcript-content {
+  padding: 48px 20px 24px;
+  gap: 0;
+}
+.message-row {
+  width: 100%;
+  max-width: 768px;
+  margin: 0 auto;
+  padding: 0 24px 24px;
+}
+.user-message {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  margin-left: auto;
+  width: fit-content;
+  max-width: 75%;
+  border-radius: 24px;
+  background: var(--muted);
+  padding: 10px 20px;
+  font-size: 15px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.assistant-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.bot-avatar {
+  width: 32px;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+.assistant-body {
+  min-width: 0;
+  flex: 1;
+  font-size: 15px;
+  line-height: 1.75;
+}
+.assistant-body [data-streamdown="heading-3"] {
+  font-size: 17px;
+}
+.assistant-body p {
+  overflow-wrap: anywhere;
+}
+.message-actions {
+  display: flex;
+  gap: 0;
+  margin: 8px 0 0 -10px;
+  opacity: 0;
+  transition: opacity 150ms;
+}
+.message-actions button {
+  border-radius: 50%;
+}
+.group:hover .message-actions,
+.group:focus-within .message-actions,
+.last-actions {
+  opacity: 1;
+}
+.feedback-selected {
+  background: var(--muted);
+  color: var(--foreground);
+}
+.citations {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 16px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.citations > span {
+  margin-right: 3px;
+}
+.citation {
+  display: grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  background: var(--muted);
+  border-radius: 50%;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  transition: background 150ms;
+}
+.citation:hover,
+.citation[aria-expanded="true"] {
+  background: var(--accent);
+  color: var(--foreground);
+}
+.citation-overlay {
+  border-radius: 12px;
+  box-shadow: 0 8px 28px #00000012;
+}
+.stopped-label {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.composer-dock {
+  flex-shrink: 0;
+  padding: 0 20px 20px;
+  background: var(--background);
+}
+.composer-wrap {
+  max-width: 768px;
+  margin: auto;
+}
+.composer-wrap textarea {
+  font-size: 16px;
+  line-height: 1.5;
+}
+.conversation-search {
+  width: 100%;
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+.empty-chat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding: 80px 0;
+}
+.empty-chat h1 {
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.5px;
+}
+.scroll-latest {
+  position: absolute;
+  bottom: 16px;
+  right: 24px;
+  border-radius: 50%;
+  background: var(--card);
+}
+.toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 13px;
+  z-index: 60;
+}
+@media (max-width: 767px) {
+  .transcript-content {
+    padding: 32px 16px 20px;
+  }
+  .message-row {
+    padding: 0 0 24px;
+  }
+  .user-message {
+    max-width: 85%;
+  }
+  .composer-dock {
+    padding: 0 12px 12px;
+  }
+  .chat-header {
+    font-size: 13px;
+  }
+  .assistant-message {
+    gap: 10px;
+  }
+  .assistant-body {
+    font-size: 14px;
+  }
+  .message-actions {
+    opacity: 1;
+  }
+  .empty-chat {
+    padding: 60px 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.brand-wordmark {
+  font-size: 16px;
+  font-weight: 750;
+  letter-spacing: -0.5px;
+}
+
+body,
+button,
+input,
+textarea,
+select {
+  font-family: "Geist Variable", "Segoe UI", sans-serif;
+}
