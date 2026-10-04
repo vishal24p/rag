@@ -80,11 +80,12 @@ written; loosen them if your env already has working newer releases.
   `from langchain_community.chat_models.vertexai` lookup inside the ragas
   import chain succeeds.
 
-### 5. UI
+### 5. HTTP API
 
-- `streamlit` -- `import streamlit as st` in `scripts/streamlit_app.py`.
-  Run with `--server.fileWatcherType=none` (already wired in
-  `scripts/run_ui.py`).
+- `fastapi` -- the thin HTTP adapter in `src/api.py` uses the existing QueryService.
+- `uvicorn` -- runs the API locally. From the repository root:
+  `.\.venv\Scripts\python.exe -m uvicorn src.api:app --app-dir backend --host 127.0.0.1 --port 8000`.
+- React is in `frontend/`; its dependencies are installed with `npm install` there.
 
 ### 6. Tests (dev-only)
 
@@ -121,7 +122,9 @@ torch>=2.0
 ragas==0.2.7
 langchain-ollama>=0.2
 langchain-community>=0.3
-streamlit>=1.30
+fastapi>=0.115
+uvicorn>=0.30
+httpx>=0.27
 pytest>=8.0
 ```
 
@@ -137,7 +140,7 @@ inline in `src/llm/factory.py` and `src/evaluation/judge.py`.
 
 ```bash
 python -c "
-import ollama, psycopg, streamlit, sentence_transformers, torch
+import ollama, psycopg, fastapi, uvicorn, sentence_transformers, torch
 import llama_index.core, llama_index.llms.ollama, llama_index.embeddings.ollama
 from ragas.evaluation import evaluate
 from langchain_ollama import ChatOllama

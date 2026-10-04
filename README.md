@@ -1,6 +1,6 @@
 # RAG over Kubernetes Docs
 
-Hybrid (BM25 + pgvector) RAG with a Jev request gateway through OpenCode Zen. Streamlit remains the UI; Ollama generates both grounded RAG answers and DIRECT answers. The gateway requires a Zen API key.
+Hybrid (BM25 + pgvector) RAG with a Jev request gateway through OpenCode Zen. React chat calls a thin FastAPI adapter; Ollama generates grounded RAG answers and DIRECT answers. The gateway requires a Zen API key.
 
 ## Stack
 
@@ -14,7 +14,8 @@ Hybrid (BM25 + pgvector) RAG with a Jev request gateway through OpenCode Zen. St
 | Generator | `minimax-m3:cloud` via Ollama (served by Ollama locally; the `:cloud` tag is just the model name) |
 | Request Gateway | Jev through OpenCode Zen: `request_block` + `retrieval_route` in one request |
 | Eval | RAGAS (faithfulness, answer relevancy, context precision) |
-| UI | Streamlit |
+| API | FastAPI |
+| UI | React + TypeScript + Vite |
 
 ## Architecture
 
@@ -29,7 +30,7 @@ The baseline: dense (pgvector) + sparse (BM25) retrieval fused by RRF, reranked,
 Jev evaluates the original query before downstream processing. A block stops the request; RAG retains the existing rewrite/retrieval/generation path; DIRECT uses the same cached Ollama client with its own prompt.
 
 ```text
-Query → Jev (request_block + retrieval_route)
+React → FastAPI → QueryService → Jev (request_block + retrieval_route)
         ├─ blocked → safe refusal
         ├─ RAG → rewrite → Dense + BM25 → RRF → CrossEncoder → RAG generator
         └─ DIRECT → same Ollama client + direct prompt
@@ -87,14 +88,14 @@ Context precision 0.333 → 1.000. Every chunk in the context window is now rele
 
 A previous version used a local safe/unsafe classifier before retrieval. That implementation has been removed and replaced by the two-decision Jev gateway above.
 
-Retrieval and RAG-generation logic carry over unchanged. The React frontend remains a separate demo; this change does not introduce FastAPI or migrate the UI.
+Retrieval and RAG-generation logic carry over unchanged. React now uses the same request service as the CLI and benchmarks, through FastAPI. Streamlit has been retired.
 
 ## Run it
 
 ### Prerequisites
 
 - **Python 3.11+** in a virtualenv (`python -m venv .venv`).
-  - Install Python packages with `pip install -r requirements.txt`. See
+  - Install Python packages with `pip install -r backend/requirements.txt` from the repository root. See
     [`requirements.md`](backend/requirements.md) for the package inventory and
     non-Python prerequisites.
 - **Ollama** running on `http://localhost:11434`, with these models pulled:
@@ -112,21 +113,29 @@ Retrieval and RAG-generation logic carry over unchanged. The React frontend rema
 
 ### Setup & launch
 
-```bash
-# 0. Install Python dependencies.
-cd backend
-pip install -r requirements.txt
+```powershell
+# From C:\Users\visha\rag. Existing virtualenv and populated database can be reused.
+uv pip install --python .venv\Scripts\python.exe -r backend\requirements.txt
 
-# 1. Create + migrate the schema from the committed migration.
-python scripts/apply_migration.py
+# Only for a new database; do not reindex an existing populated database unnecessarily.
+.\.venv\Scripts\python.exe backend\scripts\apply_migration.py
 
-# 2. Populate the configured chunks table from your corpus.
-#    Some local checkouts include an ignored reindex helper; use it only if present.
+# Terminal 1: FastAPI
+.\.venv\Scripts\python.exe -m uvicorn src.api:app --app-dir backend --host 127.0.0.1 --port 8000
 
-# 3. Open the Streamlit UI (sets PYTHONPATH, launches http://localhost:8501).
-run_ui.cmd          # Windows
-#   or: python scripts/run_ui.py
+# Terminal 2: React
+cd frontend
+npm install
+npm run dev
 ```
+
+The install command uses `uv`, which works with a virtualenv that has no `pip` module. A conventional pip-enabled virtualenv can instead use `.\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt`.
+
+Open http://127.0.0.1:5173. Node 22.18+ is required for frontend tests. Vite proxies `/api` to port 8000; the browser never receives the Zen key. API liveness is at http://127.0.0.1:8000/api/health and interactive API docs are at http://127.0.0.1:8000/docs. This setup serves the UI locally; production hosting is outside this version.
+
+Chat sends the current query only. Displayed conversations and feedback reset on refresh; they do not supply model memory. Answers arrive as complete responses. Stop cancels waiting in the browser; inference already running on the backend may continue. Sources show actual retrieved chunks for successful RAG answers. DIRECT answers and refused/failed requests have no sources. Document uploads are not included.
+
+`POST /api/query` accepts `{"query":"According to the Kubernetes docs, how do rolling updates work?"}`. It returns the answer, route, request ID, block decision, ordered contexts and both latency metrics. Successful answers use HTTP 200, refusals 403, gateway failures 503, downstream failures 500 and invalid inputs 422. Queries must be nonblank strings of at most 10,000 characters.
 
 By default `.env.example` points at the committed schema (`DB_NAME=rag`,
 `CHUNKS_TABLE=chunks`). If you keep a local-only v2 reindex helper, it can target
@@ -163,8 +172,8 @@ python -m pytest tests -q
 
 Raw-score reranker tests expect `RERANK_USE_SOFTMAX=false`. Set it in the test process environment when your local `.env` enables softmax; no production settings need changing.
 
-Query files contain one query per line. The runner reuses loaded components like Streamlit and groups median/p95 by phase, actual route and outcome. Warmup rounds are excluded. With `--warmup 0`, the first round is labeled `startup` and summarized separately from subsequent `measured` rounds. Process startup does not guarantee a cold Ollama model; it may already be loaded by another client.
+Query files contain one query per line. The runner reuses loaded components and groups median/p95 by phase, actual route and outcome. Warmup rounds are excluded. With `--warmup 0`, the first round is labeled `startup` and summarized separately from subsequent `measured` rounds. Process startup does not guarantee a cold Ollama model; it may already be loaded by another client.
 
-Each request logs its ID, block score/decision, route, failures, `jev_decision_ms` and `total_request_ms`. Total timing spans request service entry through answer/refusal/failure completion, including Jev and model initialization; it excludes UI rendering. Benchmark JSONL omits query text, answers and credentials.
+Each request logs its ID, block score/decision, route, failures, `jev_decision_ms` and `total_request_ms`. Total timing spans request service entry through answer/refusal/failure completion, including Jev and model initialization; it excludes HTTP queueing, serialization, browser/network time and UI rendering. Benchmark JSONL omits query text, answers and credentials.
 
 Compare equivalent RAG queries against a saved existing-pipeline baseline; report DIRECT separately because it intentionally skips retrieval. A live baseline could not be captured during implementation: local Ollama and ParadeDB were unavailable. No live performance improvement is claimed. Run benchmarks with the Zen key and backend services configured.

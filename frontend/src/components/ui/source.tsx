@@ -14,7 +14,7 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 
-// Adapted from prompt-kit Source (MIT) for local document previews.
+// Adapted from prompt-kit Source (MIT) for retrieved passage previews.
 const SourceContext = createContext<{
   open: boolean;
   reveal: () => void;
@@ -85,11 +85,11 @@ export function SourceTrigger({
 export function SourceContent({
   title,
   description,
-  page,
+  chunkId,
 }: {
   title: string;
   description: string;
-  page: number;
+  chunkId: number;
 }) {
   const context = useContext(SourceContext)!;
   return (
@@ -103,7 +103,7 @@ export function SourceContent({
     >
       <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
         <FileText className="size-4" />
-        <span>Sample document · Page {page}</span>
+        <span>Retrieved passage · Chunk {chunkId}</span>
       </div>
       <h3 className="mb-2 text-sm font-medium">{title}</h3>
       <p className="text-sm leading-relaxed text-muted-foreground">
