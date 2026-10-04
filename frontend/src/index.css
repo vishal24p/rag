@@ -196,10 +196,6 @@ button:focus-visible {
 .last-actions {
   opacity: 1;
 }
-.feedback-selected {
-  background: var(--muted);
-  color: var(--foreground);
-}
 .citations {
   display: flex;
   align-items: center;

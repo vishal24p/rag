@@ -7,8 +7,6 @@ import {
   Plus,
   Search,
   Square,
-  ThumbsDown,
-  ThumbsUp,
 } from "lucide-react";
 import { BotAvatar } from "bot-avatars";
 import { Button } from "@/components/ui/button";
@@ -50,7 +48,6 @@ type ChatMessage = {
   role: "user" | "assistant";
   text: string;
   stopped?: boolean;
-  feedback?: "up" | "down";
   result?: QueryResponse;
   error?: boolean;
 };
@@ -169,26 +166,6 @@ function ChatApp() {
         setPending(null);
       }
     }
-  }
-  function updateFeedback(id: string, feedback: "up" | "down") {
-    setThreads(prev =>
-      prev.map(thread =>
-        thread.id === activeId
-          ? {
-              ...thread,
-              messages: thread.messages.map(message =>
-                message.id === id
-                  ? {
-                      ...message,
-                      feedback:
-                        message.feedback === feedback ? undefined : feedback,
-                    }
-                  : message
-              ),
-            }
-          : thread
-      )
-    );
   }
   async function copy(text: string) {
     try {
@@ -424,36 +401,6 @@ function ChatApp() {
                                   onClick={() => copy(message.text)}
                                 >
                                   <Copy className="size-4" />
-                                </MessageAction>
-                                <MessageAction
-                                  tooltip="Upvote"
-                                  label="Helpful answer"
-                                  aria-pressed={message.feedback === "up"}
-                                  onClick={() =>
-                                    updateFeedback(message.id, "up")
-                                  }
-                                  className={
-                                    message.feedback === "up"
-                                      ? "feedback-selected"
-                                      : ""
-                                  }
-                                >
-                                  <ThumbsUp className="size-4" />
-                                </MessageAction>
-                                <MessageAction
-                                  tooltip="Downvote"
-                                  label="Unhelpful answer"
-                                  aria-pressed={message.feedback === "down"}
-                                  onClick={() =>
-                                    updateFeedback(message.id, "down")
-                                  }
-                                  className={
-                                    message.feedback === "down"
-                                      ? "feedback-selected"
-                                      : ""
-                                  }
-                                >
-                                  <ThumbsDown className="size-4" />
                                 </MessageAction>
                               </div>}
                             </div>

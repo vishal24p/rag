@@ -133,7 +133,7 @@ The install command uses `uv`, which works with a virtualenv that has no `pip` m
 
 Open http://127.0.0.1:5173. Node 22.18+ is required for frontend tests. Vite proxies `/api` to port 8000; the browser never receives the Zen key. API liveness is at http://127.0.0.1:8000/api/health and interactive API docs are at http://127.0.0.1:8000/docs. This setup serves the UI locally; production hosting is outside this version.
 
-Chat sends the current query only. Displayed conversations and feedback reset on refresh; they do not supply model memory. Answers arrive as complete responses. Stop cancels waiting in the browser; inference already running on the backend may continue. Sources show actual retrieved chunks for successful RAG answers. DIRECT answers and refused/failed requests have no sources. Document uploads are not included.
+Chat sends the current query only. Displayed conversations reset on refresh; they do not supply model memory. Answers arrive as complete responses. Stop cancels waiting in the browser; inference already running on the backend may continue. Sources show actual retrieved chunks for successful RAG answers. DIRECT answers and refused/failed requests have no sources. Document uploads are not included.
 
 `POST /api/query` accepts `{"query":"According to the Kubernetes docs, how do rolling updates work?"}`. It returns the answer, route, request ID, block decision, ordered contexts and both latency metrics. Successful answers use HTTP 200, refusals 403, gateway failures 503, downstream failures 500 and invalid inputs 422. Queries must be nonblank strings of at most 10,000 characters.
 

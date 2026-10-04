@@ -34,7 +34,7 @@ Vite proxies `/api` to port 8000. Backend settings and Zen credentials belong in
 
 Live text chat through `POST /api/query`. Jev chooses refusal, RAG or DIRECT before downstream work. Answers arrive as complete responses; loading state does not simulate token streaming. Only successful RAG answers have sources. Completed requests show `jev_decision_ms` and `total_request_ms` from the backend service; total excludes HTTP queueing, serialization, browser/network time and rendering.
 
-Threads and feedback reset on refresh. Each request contains the current query only, so displayed chat history does not provide model memory. No document uploads or indexing controls are included. Stop cancels the browser request and ignores late results; backend inference already running can continue. API/provider failures show an error rather than a sample answer.
+Threads reset on refresh. Each request contains the current query only, so displayed chat history does not provide model memory. No document uploads or indexing controls are included. Stop cancels the browser request and ignores late results; backend inference already running can continue. API/provider failures show an error rather than a sample answer.
 
 ## Verification
 
