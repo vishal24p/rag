@@ -10,6 +10,9 @@ Behavior contract:
 from __future__ import annotations
 
 import importlib
+import logging
+
+import pytest
 
 
 class _FakeChatResp:
@@ -129,3 +132,21 @@ def test_rewrite_returns_original_on_whitespace_response(monkeypatch):
 
     out = rw.rewrite("how do pods work?")
     assert out == "how do pods work?"
+
+
+@pytest.mark.parametrize("response, status", [
+    ("PRIVATE_REWRITTEN_QUERY", "ok"),
+    ("", "empty-response"),
+    (RuntimeError("PRIVATE_QUERY PRIVATE_CHUNK PRIVATE_CREDENTIAL PRIVATE_BODY"), "llm-error"),
+])
+def test_rewrite_logs_only_safe_status_and_timing(monkeypatch, caplog, response, status):
+    qr = _reload_module(monkeypatch, enabled=True)
+    caplog.set_level(logging.DEBUG, logger=qr.__name__)
+
+    out = qr.QueryRewriter(llm=_FakeLLM(response)).rewrite("PRIVATE_QUERY")
+
+    assert out == (response if isinstance(response, str) and response else "PRIVATE_QUERY")
+    assert caplog.records
+    assert "PRIVATE_" not in caplog.text
+    assert f"status={status}" in caplog.text
+    assert "ms" in caplog.text

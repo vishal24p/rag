@@ -46,8 +46,8 @@ class Generator:
             log.info("llm chat OK words=%d (%.1f ms)",
                      len(text.split()), (time.perf_counter() - t) * 1000.0)
             return text
-        except Exception as exc:
-            log.warning("llm chat failed, fallback complete(): %s", exc)
+        except Exception:
+            log.warning("llm chat failed, fallback complete()")
             t = time.perf_counter()
             full_prompt = f"{SYSTEM_PROMPT}\n\n{user_msg}"
             log.debug("complete prompt chars=%d", len(full_prompt))

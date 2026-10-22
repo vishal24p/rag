@@ -1,6 +1,8 @@
 """Unit tests for Generator using a fake chat LLM."""
 from __future__ import annotations
 
+import logging
+
 from llama_index.core.llms import ChatMessage, ChatResponse
 
 
@@ -51,3 +53,18 @@ def test_generate_accepts_dict_contexts():
     user_text = g.llm.last_chat[1].content
     assert "[1] alpha" in user_text
     assert "[2] beta" in user_text
+
+
+def test_generate_fallback_does_not_log_private_content(monkeypatch, caplog):
+    g = _gen_with_fake(reply="PRIVATE_ANSWER")
+
+    def fail_chat(*args, **kwargs):
+        raise RuntimeError("PRIVATE_QUERY PRIVATE_CHUNK PRIVATE_CREDENTIAL PRIVATE_BODY")
+
+    monkeypatch.setattr(g.llm, "chat", fail_chat)
+    caplog.set_level(logging.DEBUG, logger="src.generation.generator")
+
+    assert "PRIVATE_ANSWER" in g.generate("PRIVATE_QUERY", ["PRIVATE_CHUNK"])
+    assert g.llm.last_complete is not None
+    assert "fallback complete()" in caplog.text
+    assert "PRIVATE_" not in caplog.text

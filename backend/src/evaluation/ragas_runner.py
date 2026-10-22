@@ -325,7 +325,6 @@ def evaluate_pipeline(
     t0 = time.perf_counter()
     for qa in qa_set:
         log.info("=== running QA id=%s ===", qa["id"])
-        log.info("Q: %s", qa["question"][:120])
         contexts, answer = run_rag_pipeline(qa["question"], conn_str)
         samples.append(SingleTurnSample(
             user_input=qa["question"],
