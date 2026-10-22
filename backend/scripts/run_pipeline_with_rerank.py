@@ -1,7 +1,7 @@
 r"""End-to-end demo: same query, RRF and reranked views side by side.
 
    1. RRF output
-   2. RRF + cross-encoder rerank
+   2. RRF + Jev rerank
 
 Usage (PowerShell, venv active):
     $env:PYTHONPATH = "C:\Users\visha\rag"
@@ -35,7 +35,7 @@ def main():
         f"[cfg] dense_top_k={settings.dense_top_k} "
         f"sparse_top_k={settings.sparse_top_k} "
         f"rrf_top_n={settings.rrf_top_n} "
-        f"rerank_model={settings.rerank_model} "
+        f"rerank_model={settings.jev_model} "
         f"rerank_top_n={settings.rerank_top_n} "
         f"jev_model={settings.jev_model} "
         f"query_rewrite={'on' if settings.query_rewrite_enabled else 'off'} "

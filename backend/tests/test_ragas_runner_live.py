@@ -136,7 +136,7 @@ def test_live_ragas_captures_actual_answer_relevancy_outputs_and_details(monkeyp
             gen_model="generator",
             judge_model="judge",
             embed_model="embeddings",
-            rerank_model="reranker",
+            jev_model="reranker",
         ),
     )
 

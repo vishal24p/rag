@@ -10,7 +10,7 @@ Hybrid (BM25 + pgvector) RAG with a Jev request gateway through OpenCode Zen. Re
 | Embeddings | `nomic-embed-text-v2-moe` via Ollama |
 | Semantic Chunker | LlamaIndex `SemanticSplitterNodeParser` |
 | Hybrid Fusion | RRF (Reciprocal Rank Fusion, k=60) |
-| Reranker | `cross-encoder/ms-marco-MiniLM-L-6-v2` |
+| Reranker | Jev Noul relevance scores through OpenCode Zen |
 | Generator | `minimax-m3:cloud` via Ollama (served by Ollama locally; the `:cloud` tag is just the model name) |
 | Request Gateway | Jev through OpenCode Zen: `request_block` + `retrieval_route` in one request |
 | Eval | RAGAS (faithfulness, answer relevancy, context precision) |
@@ -32,11 +32,11 @@ Jev evaluates the original query before downstream processing. A block stops the
 ```text
 React → FastAPI → QueryService → Jev (request_block + retrieval_route)
         ├─ blocked → safe refusal
-        ├─ RAG → rewrite → Dense + BM25 → RRF → CrossEncoder → RAG generator
+        ├─ RAG → rewrite → Dense + BM25 → RRF → Jev rerank → RAG generator
         └─ DIRECT → same Ollama client + direct prompt
 ```
 
-Timeouts, invalid responses and provider failures stop the request with a service error. There is no safety bypass or legacy guard fallback. Jev receives the query and a short KB scope description, never retrieved documents.
+Timeouts, invalid responses and provider failures stop the request with a service error. The gateway sends Jev the original query and a short KB scope description. On the RAG route, a separate reranking request sends the rewritten query as shared state and retrieved candidate chunk text in one Noul relevance question per chunk. These chunks leave the local backend for OpenCode Zen. The generator then receives the highest-scoring chunks.
 
 ## Version log
 
@@ -48,7 +48,7 @@ Timeouts, invalid responses and provider failures stop the request with a servic
 
 Chunker: SemanticSplitterNodeParser, buffer 2, breakpoint percentile 95. Tight window plus strict threshold meant splits almost never fired on docs where paragraphs only loosely related. Whole pages stayed glued. Average chunk size: **2,813 chars**.
 
-Retrieval: dense `DENSE_TOP_K` + sparse `SPARSE_TOP_K` → RRF `RRF_TOP_N` →
+Original V1 retrieval: dense `DENSE_TOP_K` + sparse `SPARSE_TOP_K` → RRF `RRF_TOP_N` →
 cross-encoder rerank → `RERANK_TOP_N` to the LLM. The composite retriever
 returns both the RRF output and the final reranked context, so callers do not
 run hybrid retrieval twice.
@@ -88,7 +88,7 @@ Context precision 0.333 → 1.000. Every chunk in the context window is now rele
 
 A previous version used a local safe/unsafe classifier before retrieval. That implementation has been removed and replaced by the two-decision Jev gateway above.
 
-Retrieval and RAG-generation logic carry over unchanged. React now uses the same request service as the CLI and benchmarks, through FastAPI. Streamlit has been retired.
+The current version replaces the local cross-encoder with Jev reranking. Hybrid retrieval and RAG generation retain their existing interfaces. React uses the same request service as the CLI and benchmarks, through FastAPI. Streamlit has been retired.
 
 ## Run it
 
@@ -156,8 +156,11 @@ Set these in `backend/.env`. Existing environment variables take precedence.
 | `JEV_TIMEOUT_SECONDS` | `10`, positive HTTP timeout; no automatic retries |
 | `JEV_BLOCK_THRESHOLD` | `0.5`; block when the Noul probability is strictly greater |
 | `JEV_KB_DESCRIPTION` | Short trusted description of the indexed corpus; default Kubernetes docs |
+| `JEV_RERANK_PROMPT_PATH` | `prompts/jev_reranker.md`; editable Markdown instructions, resolved relative to `backend/` unless absolute |
 
-`request_block` covers prompt injection, bypass/override attempts, hidden information or secrets, and clearly harmful/disallowed assistance. `retrieval_route` selects RAG or DIRECT using the KB scope. The adapter in `backend/src/gateway.py` is the only provider-specific module. Existing RAG prompts and the cached Ollama factory stay unchanged.
+`request_block` covers prompt injection, bypass/override attempts, hidden information or secrets, and clearly harmful/disallowed assistance. `retrieval_route` selects RAG or DIRECT using the KB scope. The gateway adapter lives in `backend/src/gateway.py`; the reranker lives in `backend/src/retrieval/reranker.py`.
+
+Reranking uses one System One request for up to 32 candidates from `RRF_TOP_N`. Each question includes the Markdown prompt and only its target chunk. Returned Noul probabilities in `[0, 1]` replace candidate scores; chunks are sorted descending and limited by `RERANK_TOP_N`. No local reranker model or softmax setting is required. Empty candidate lists skip the request; more than 32 candidates, an unreadable or empty prompt, and malformed responses fail safely.
 
 ## Latency benchmark
 
@@ -170,7 +173,7 @@ python scripts/benchmark_gateway.py --queries queries.txt --repeat 10 --warmup 0
 python -m pytest tests -q
 ```
 
-Raw-score reranker tests expect `RERANK_USE_SOFTMAX=false`. Set it in the test process environment when your local `.env` enables softmax; no production settings need changing.
+Reranker tests use mocked HTTP responses; they do not require a live Zen key or local reranker model.
 
 Query files contain one query per line. The runner reuses loaded components and groups median/p95 by phase, actual route and outcome. Warmup rounds are excluded. With `--warmup 0`, the first round is labeled `startup` and summarized separately from subsequent `measured` rounds. Process startup does not guarantee a cold Ollama model; it may already be loaded by another client.
 

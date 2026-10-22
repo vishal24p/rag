@@ -12,10 +12,6 @@ llama-index>=0.12
 # --- Postgres / vector store driver ---
 psycopg[binary]>=3.1
 
-# --- Cross-encoder reranker ---
-sentence-transformers>=3.0
-torch>=2.0
-
 # --- RAGAS evaluation stack ---
 ragas==0.2.7
 langchain-ollama>=0.2

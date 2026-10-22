@@ -305,7 +305,7 @@ def score_with_ragas(
                 "generator": settings.gen_model,
                 "judge_llm": settings.judge_model,
                 "evaluation_embeddings": settings.embed_model,
-                "reranker": settings.rerank_model,
+                "reranker": settings.jev_model,
             },
             "logs": logs,
         },
