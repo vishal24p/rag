@@ -21,11 +21,10 @@ from src.query_service import QueryService  # noqa: E402
 QUERY = "How do H1, H2, H3 heading levels work in markdown?"
 
 
-def show(name, hits, n_chars=160):
+def show(name, hits):
     print(f"\n== {name} ({len(hits)} hits) ==")
     for i, h in enumerate(hits, 1):
-        preview = h["content"].replace("\n", " ")[:n_chars]
-        print(f"  {i}. id={h['chunk_id']:<5}  score={h['score']:.4f}  | {preview}...")
+        print(f"  {i}. id={h['chunk_id']:<5}  score={h['score']:.4f}")
 
 
 def main():
@@ -47,15 +46,10 @@ def main():
     print(f"[timing] jev_decision_ms={result.jev_decision_ms} "
           f"total_request_ms={result.total_request_ms:.2f}")
     if result.status != "ok":
-        print(result.answer)
         return 1 if result.status == "error" else 0
     if result.route == "DIRECT":
         print("[DIRECT] Retrieval not required; diagnostic finished without generation.")
         return 0
-    query = result.rewritten_query
-    if query != original_query:
-        print(f"\n[rewrite] {original_query}\n     -> {query}")
-
     rrf_pool, reranked = result.rrf, result.contexts
 
     show(f"RRF pool (top {settings.rrf_top_n})", rrf_pool)
