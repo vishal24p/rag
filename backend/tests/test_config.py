@@ -21,20 +21,16 @@ def test_settings_db_url(monkeypatch):
     assert s.db_url == "postgresql://rag:secret@localhost:56432/rag"
 
 
-def test_settings_rerank_use_softmax_parses_true_and_false(monkeypatch):
+def test_settings_jev_rerank_prompt_path_is_configurable(monkeypatch):
     import importlib
     import src.config as cfg_mod
 
-    monkeypatch.setenv("RERANK_USE_SOFTMAX", "true")
+    monkeypatch.setenv("JEV_RERANK_PROMPT_PATH", "custom/relevance.md")
     importlib.reload(cfg_mod)
-    assert cfg_mod.Settings().rerank_use_softmax is True
-
-    monkeypatch.setenv("RERANK_USE_SOFTMAX", "false")
-    importlib.reload(cfg_mod)
-    assert cfg_mod.Settings().rerank_use_softmax is False
+    assert cfg_mod.Settings().jev_rerank_prompt_path == "custom/relevance.md"
 
 
-def test_settings_rerank_use_softmax_defaults_disabled(monkeypatch):
+def test_settings_jev_rerank_prompt_path_default(monkeypatch):
     import importlib
     import src.config as cfg_mod
     from pathlib import Path
@@ -42,9 +38,11 @@ def test_settings_rerank_use_softmax_defaults_disabled(monkeypatch):
     original_exists = Path.exists
     monkeypatch.setattr(Path, "exists", lambda path: False if path.name == ".env" else original_exists(path))
 
-    monkeypatch.delenv("RERANK_USE_SOFTMAX", raising=False)
+    monkeypatch.delenv("JEV_RERANK_PROMPT_PATH", raising=False)
     importlib.reload(cfg_mod)
-    assert cfg_mod.Settings().rerank_use_softmax is False
+    assert cfg_mod.Settings().jev_rerank_prompt_path == "prompts/jev_reranker.md"
+    assert not hasattr(cfg_mod.Settings(), "rerank_use_softmax")
+    assert not hasattr(cfg_mod.Settings(), "rerank_model")
 
 
 def test_settings_retrieval_limits_are_configurable(monkeypatch):

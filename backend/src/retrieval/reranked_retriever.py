@@ -1,10 +1,10 @@
-"""Composite retriever: Hybrid (RRF) -> CrossEncoderReranker.
+"""Composite retriever: Hybrid (RRF) -> JevReranker.
 
 Pipeline:
    query
      -> HybridRetriever.retrieve(query, top_k_dense=N, top_k_sparse=N, top_k=rrf)
         (returns the configured post-RRF candidate list)
-     -> CrossEncoderReranker.rerank(query, candidates[:rrf], top_n=final)
+     -> JevReranker.rerank(query, candidates[:rrf], top_n=final)
         (re-scores by query/chunk relevance and keeps the best)
 """
 from __future__ import annotations
@@ -14,7 +14,7 @@ import time
 
 from src.config import settings
 from src.retrieval.hybrid_retriever import HybridRetriever
-from src.retrieval.reranker import CrossEncoderReranker
+from src.retrieval.reranker import JevReranker
 
 log = logging.getLogger(__name__)
 
@@ -24,10 +24,10 @@ class RerankedRetriever:
         self,
         connection_string: str,
         hybrid: HybridRetriever | None = None,
-        reranker: CrossEncoderReranker | None = None,
+        reranker: JevReranker | None = None,
     ) -> None:
         self.hybrid = hybrid or HybridRetriever(connection_string)
-        self.reranker = reranker or CrossEncoderReranker()
+        self.reranker = reranker or JevReranker()
 
     def retrieve(
         self,
@@ -40,7 +40,7 @@ class RerankedRetriever:
         """Return (rrf_output, reranked_top_n).
 
         The first list lets callers inspect the RRF output. Only its
-        configured post-RRF prefix is passed to the cross-encoder; the second
+        configured post-RRF prefix is passed to Jev; the second
         list is the final context passed to the generator.
         """
         dense_limit = top_k_dense if top_k_dense is not None else settings.dense_top_k
