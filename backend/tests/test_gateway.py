@@ -13,7 +13,7 @@ def provider(payload, captured=None):
         if captured is not None:
             captured.append(request)
         return httpx.Response(200, json=payload)
-    return OpenCodeJevProvider(api_key="test-key", transport=httpx.MockTransport(handle))
+    return OpenCodeJevProvider(api_key="test-key", model="jev-1.13", transport=httpx.MockTransport(handle))
 
 
 def test_single_request_two_questions_original_state():

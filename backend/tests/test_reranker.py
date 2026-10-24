@@ -80,6 +80,42 @@ def test_reranker_empty_input_skips_request(monkeypatch, tmp_path):
     assert calls == []
 
 
+def test_empty_candidates_need_no_key_or_prompt(monkeypatch, tmp_path):
+    import src.retrieval.reranker as module
+
+    reranker, calls = _reranker(monkeypatch, tmp_path, api_key="")
+    monkeypatch.setattr(module, "settings", replace(
+        module.settings, jev_rerank_prompt_path=str(tmp_path / "missing.md"),
+    ))
+    assert reranker.rerank("q", []) == []
+    assert calls == []
+
+
+def test_directory_prompt_fails_before_http(monkeypatch, tmp_path):
+    import src.retrieval.reranker as module
+    from src.gateway import GatewayError
+
+    reranker, calls = _reranker(monkeypatch, tmp_path)
+    monkeypatch.setattr(module, "settings", replace(
+        module.settings, jev_rerank_prompt_path=str(tmp_path),
+    ))
+    with pytest.raises(GatewayError, match="gateway-invalid-response"):
+        reranker.rerank("q", [_hit(1, "chunk")])
+    assert calls == []
+
+
+def test_reranker_logs_counts_without_private_content(monkeypatch, tmp_path, caplog):
+    import logging
+
+    reranker, _ = _reranker(monkeypatch, tmp_path, {
+        "answers": {"chunk_0": {"type": "noul", "noul": 0.5}},
+    }, api_key="PRIVATE_KEY")
+    with caplog.at_level(logging.INFO, logger="src.retrieval.reranker"):
+        reranker.rerank("PRIVATE_QUERY", [_hit(1, "PRIVATE_CHUNK")])
+    assert "in=1 out=1" in caplog.text
+    assert "PRIVATE_" not in caplog.text
+
+
 @pytest.mark.parametrize("answers", [
     {},
     {"chunk_0": {"type": "choice", "noul": 0.9}},

@@ -67,6 +67,56 @@ def test_health_never_calls_pipeline(client):
     assert calls == []
 
 
+def test_query_accepts_exact_length_limit(client):
+    api, calls, _ = client
+    query = "x" * 10000
+    assert api.post("/api/query", json={"query": query}).status_code == 200
+    assert calls == [query]
+
+
+@pytest.mark.parametrize("body", [None, [], {"query": None}, {"query": []}, {"query": {}}])
+def test_query_rejects_invalid_json_types(client, body):
+    import json
+
+    api, calls, _ = client
+    assert api.post("/api/query", content=json.dumps(body),
+                    headers={"Content-Type": "application/json"}).status_code == 422
+    assert calls == []
+
+
+def test_malformed_json_never_calls_pipeline(client):
+    api, calls, _ = client
+    assert api.post("/api/query", content='{"query":',
+                    headers={"Content-Type": "application/json"}).status_code == 422
+    assert calls == []
+
+
+@pytest.mark.parametrize("error,code", [("PRIVATE_EXCEPTION", 500),
+                                         ("gateway-PRIVATE_EXCEPTION", 503)])
+def test_unknown_errors_are_masked_and_contexts_removed(client, error, code):
+    api, _, result = client
+    result.status, result.error = "error", error
+    response = api.post("/api/query", json={"query": "q"})
+    assert response.status_code == code
+    assert response.json()["error"] == "request-error"
+    assert response.json()["contexts"] == []
+    assert "PRIVATE_EXCEPTION" not in response.text
+
+
+@pytest.mark.parametrize("field,value", [("chunk_id", True), ("chunk_id", "1"),
+                                         ("content", 1), ("score", True),
+                                         ("score", "0.5"), ("score", float("nan")),
+                                         ("score", float("inf"))])
+def test_context_rejects_invalid_types_and_nonfinite_scores(field, value):
+    from pydantic import ValidationError
+    from src.api import Context
+
+    chunk = {"chunk_id": 1, "content": "passage", "score": 0.5}
+    chunk[field] = value
+    with pytest.raises(ValidationError):
+        Context(**chunk)
+
+
 def test_component_cache_is_lazy_and_serializes_first_construction():
     calls = []
     def build():
