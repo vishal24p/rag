@@ -4,7 +4,7 @@ Goals:
 - Pure stdlib (no extra deps).
 - Single-line format. No JSON. No colors.
 - Configurable level from env LOG_LEVEL (default INFO).
-- Safe across CLI + Streamlit (re-configuring won't double-log).
+- Safe across CLI + API (re-configuring won't double-log).
 - Third-party libraries (httpx, urllib3, huggingface_hub, etc.) are quieted
   to WARNING so the line timeline is clean.
 

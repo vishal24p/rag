@@ -30,13 +30,6 @@ def _int_env(name: str, default: int) -> int:
         return default
 
 
-def _bool_env(name: str, default: bool) -> bool:
-    raw = os.getenv(name)
-    if raw is None or raw == "":
-        return default
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
-
-
 @dataclass(frozen=True)
 class Settings:
     db_host: str = os.getenv("DB_HOST", "localhost")
@@ -56,13 +49,14 @@ class Settings:
     jev_timeout_seconds: float = float(os.getenv("JEV_TIMEOUT_SECONDS", "10"))
     jev_block_threshold: float = float(os.getenv("JEV_BLOCK_THRESHOLD", "0.5"))
     jev_kb_description: str = os.getenv("JEV_KB_DESCRIPTION", "Kubernetes documentation")
+    jev_rerank_prompt_path: str = os.getenv(
+        "JEV_RERANK_PROMPT_PATH", "prompts/jev_reranker.md",
+    )
 
-    rerank_model: str = os.getenv("RERANK_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2")
     dense_top_k: int = _int_env("DENSE_TOP_K", 10)
     sparse_top_k: int = _int_env("SPARSE_TOP_K", 10)
     rrf_top_n: int = _int_env("RRF_TOP_N", 20)
     rerank_top_n: int = _int_env("RERANK_TOP_N", 5)
-    rerank_use_softmax: bool = _bool_env("RERANK_USE_SOFTMAX", False)
 
     # Query rewriting: runs after the gateway selects RAG, before retrieval.
     # Rewrites the user's single query into a clearer search query.

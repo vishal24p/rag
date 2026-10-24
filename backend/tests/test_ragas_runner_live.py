@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import logging
 import sys
 from types import SimpleNamespace
 
@@ -136,7 +137,7 @@ def test_live_ragas_captures_actual_answer_relevancy_outputs_and_details(monkeyp
             gen_model="generator",
             judge_model="judge",
             embed_model="embeddings",
-            rerank_model="reranker",
+            jev_model="reranker",
         ),
     )
 
@@ -197,3 +198,23 @@ def test_answer_relevancy_trace_shows_cosines_and_noncommittal_penalty():
     assert trace["cosine_average"] == 0.7
     assert trace["noncommittal_penalty_applied"] is False
     assert trace["final_score"] == 0.7
+
+
+def test_evaluate_pipeline_logs_progress_without_private_content(monkeypatch, caplog):
+    monkeypatch.setattr(
+        ragas_runner, "run_rag_pipeline",
+        lambda query, conn: (["PRIVATE_CHUNK"], "PRIVATE_ANSWER"),
+    )
+    monkeypatch.setattr(ragas_runner, "build_judge_embeddings", lambda: object())
+    scores = _FakeResult()
+    scores.scores = [dict.fromkeys(ragas_runner.METRIC_NAMES, 0.8)]
+    monkeypatch.setattr(ragas_runner, "evaluate", lambda **kwargs: scores)
+    caplog.set_level(logging.DEBUG, logger=ragas_runner.__name__)
+
+    result = ragas_runner.evaluate_pipeline(
+        [{"id": 7, "question": "PRIVATE_QUESTION"}], "PRIVATE_CREDENTIAL", object(),
+    )
+
+    assert result["per_row"][0]["question"] == "PRIVATE_QUESTION"
+    assert "id=7" in caplog.text
+    assert "PRIVATE_" not in caplog.text

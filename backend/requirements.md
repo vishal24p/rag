@@ -31,7 +31,7 @@ written; loosen them if your env already has working newer releases.
 
 - `ollama` -- the official Ollama Python SDK, used by the existing
   LlamaIndex Ollama generation, rewriting and embedding integrations.
-- `httpx` -- the Jev adapter calls the OpenCode Zen System One endpoint.
+- `httpx` -- the Jev gateway and reranker call the OpenCode Zen System One endpoint.
   Configure `JEV_API_KEY`, `JEV_API_URL`, `JEV_MODEL`, `JEV_TIMEOUT_SECONDS`,
   `JEV_BLOCK_THRESHOLD` and `JEV_KB_DESCRIPTION` in `.env`.
 - `llama-index-core` -- Document / PromptTemplate / ChatMessage /
@@ -54,16 +54,16 @@ written; loosen them if your env already has working newer releases.
 - `pgvector` -- ParadedDB side, not strictly needed on the client; the
   `CREATE EXTENSION` lives server-side.
 
-### 3. Cross-encoder reranker
+### 3. Jev reranker
 
-- `sentence-transformers` -- `from sentence_transformers import CrossEncoder`
-  in `src/retrieval/reranker.py`. Used only the first time
-  `CrossEncoderReranker._ensure_model()` runs; lazy-loaded so the rest of
-  the pipeline can skip the download if you A/B-test with the identity
-  fallback.
-- `torch` -- transitive dep of `sentence-transformers`. `transformers` is
-  also pulled in transitively (the logging_setup silences its logger to
-  ERROR on purpose, see point 5).
+- No local model package is needed. The reranker uses `httpx` to send one
+  System One request with one Noul relevance question per candidate chunk.
+- `JEV_RERANK_PROMPT_PATH` selects the editable Markdown instructions file
+  (default `prompts/jev_reranker.md`, relative to `backend/` unless absolute).
+  The rewritten query is shared state; each question includes the prompt and
+  its retrieved candidate chunk text, which is sent to OpenCode Zen for reranking.
+  One request supports at most 32 candidates. Noul probabilities replace scores;
+  descending score order and `RERANK_TOP_N` select the final context.
 
 ### 4. RAGAS evaluation stack
 
@@ -80,11 +80,12 @@ written; loosen them if your env already has working newer releases.
   `from langchain_community.chat_models.vertexai` lookup inside the ragas
   import chain succeeds.
 
-### 5. UI
+### 5. HTTP API
 
-- `streamlit` -- `import streamlit as st` in `scripts/streamlit_app.py`.
-  Run with `--server.fileWatcherType=none` (already wired in
-  `scripts/run_ui.py`).
+- `fastapi` -- the thin HTTP adapter in `src/api.py` uses the existing QueryService.
+- `uvicorn` -- runs the API locally. From the repository root:
+  `.\.venv\Scripts\python.exe -m uvicorn src.api:app --app-dir backend --host 127.0.0.1 --port 8000`.
+- React is in `frontend/`; its dependencies are installed with `npm install` there.
 
 ### 6. Tests (dev-only)
 
@@ -116,12 +117,12 @@ llama-index-llms-ollama>=0.3
 llama-index-embeddings-ollama>=0.5
 llama-index>=0.12
 psycopg[binary]>=3.1
-sentence-transformers>=3.0
-torch>=2.0
 ragas==0.2.7
 langchain-ollama>=0.2
 langchain-community>=0.3
-streamlit>=1.30
+fastapi>=0.115
+uvicorn>=0.30
+httpx>=0.27
 pytest>=8.0
 ```
 
@@ -137,7 +138,7 @@ inline in `src/llm/factory.py` and `src/evaluation/judge.py`.
 
 ```bash
 python -c "
-import ollama, psycopg, streamlit, sentence_transformers, torch
+import ollama, psycopg, fastapi, uvicorn, httpx
 import llama_index.core, llama_index.llms.ollama, llama_index.embeddings.ollama
 from ragas.evaluation import evaluate
 from langchain_ollama import ChatOllama

@@ -305,7 +305,7 @@ def score_with_ragas(
                 "generator": settings.gen_model,
                 "judge_llm": settings.judge_model,
                 "evaluation_embeddings": settings.embed_model,
-                "reranker": settings.rerank_model,
+                "reranker": settings.jev_model,
             },
             "logs": logs,
         },
@@ -325,7 +325,6 @@ def evaluate_pipeline(
     t0 = time.perf_counter()
     for qa in qa_set:
         log.info("=== running QA id=%s ===", qa["id"])
-        log.info("Q: %s", qa["question"][:120])
         contexts, answer = run_rag_pipeline(qa["question"], conn_str)
         samples.append(SingleTurnSample(
             user_input=qa["question"],

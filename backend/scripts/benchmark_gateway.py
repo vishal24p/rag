@@ -64,7 +64,7 @@ def main() -> int:
     if not settings.jev_api_key:
         parser.error("set JEV_API_KEY in backend/.env before benchmarking")
 
-    # Reuse loaded components between rounds, as the Streamlit app does.
+    # Reuse loaded components between rounds, as the API does.
     @cache
     def retriever():
         from src.retrieval.reranked_retriever import RerankedRetriever

@@ -7,8 +7,6 @@ import {
   Plus,
   Search,
   Square,
-  ThumbsDown,
-  ThumbsUp,
 } from "lucide-react";
 import { BotAvatar } from "bot-avatars";
 import { Button } from "@/components/ui/button";
@@ -44,56 +42,18 @@ import {
   PromptInputActions,
   PromptInputTextarea,
 } from "@/components/prompt-kit/prompt-input";
-import {
-  documents,
-  openingAnswer,
-  openingQuestion,
-  createDemoAnswer,
-  validPrompt,
-} from "@/lib/demo";
+import { sendQuery, validPrompt, type QueryResponse } from "@/lib/api";
 type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   text: string;
   stopped?: boolean;
-  feedback?: "up" | "down";
+  result?: QueryResponse;
+  error?: boolean;
 };
 type Thread = { id: string; title: string; messages: ChatMessage[] };
-const initialThreads: Thread[] = [
-  { id: "welcome", title: "New conversation", messages: [] },
-  {
-    id: "launch",
-    title: "Q4 launch priorities",
-    messages: [
-      { id: "q1", role: "user", text: openingQuestion },
-      { id: "a1", role: "assistant", text: openingAnswer },
-    ],
-  },
-  {
-    id: "research",
-    title: "What our customers need",
-    messages: [
-      {
-        id: "q2",
-        role: "user",
-        text: "Compare the strategy with customer research.",
-      },
-      {
-        id: "a2",
-        role: "assistant",
-        text: createDemoAnswer("compare research"),
-      },
-    ],
-  },
-  {
-    id: "risks",
-    title: "Roadmap & dependencies",
-    messages: [
-      { id: "q3", role: "user", text: "What are the biggest launch risks?" },
-      { id: "a3", role: "assistant", text: createDemoAnswer("risks") },
-    ],
-  },
-];
+const initialThreads: Thread[] = [{ id: "welcome", title: "New conversation", messages: [] }];
+type PendingRequest = { threadId: string; messageId: string; controller: AbortController };
 function ChatApp() {
   const { setOpenMobile } = useSidebar();
   const [dark, setDark] = useState(() =>
@@ -116,17 +76,13 @@ function ChatApp() {
     }
   }
   const [threads, setThreads] = useState<Thread[]>(initialThreads);
-  const [activeId, setActiveId] = useState("launch");
+  const [activeId, setActiveId] = useState("welcome");
   const [input, setInput] = useState("");
   const [toast, setToast] = useState("");
   const [search, setSearch] = useState("");
   const [searching, setSearching] = useState(false);
-  const [stream, setStream] = useState<{
-    threadId: string;
-    messageId: string;
-    text: string;
-  } | null>(null);
-  const generating = useRef(false);
+  const [pending, setPending] = useState<PendingRequest | null>(null);
+  const requestRef = useRef<PendingRequest | null>(null);
   const composerRef = useRef<HTMLDivElement>(null);
   const active = threads.find(thread => thread.id === activeId)!;
 
@@ -135,53 +91,22 @@ function ChatApp() {
     const timer = setTimeout(() => setToast(""), 3500);
     return () => clearTimeout(timer);
   }, [toast]);
-  useEffect(() => {
-    if (!stream) return;
-    let cursor = 0;
-    const timer = setInterval(() => {
-      cursor = Math.min(cursor + 18, stream.text.length);
-      const text = stream.text.slice(0, cursor);
-      setThreads(prev =>
-        prev.map(thread =>
-          thread.id === stream.threadId
-            ? {
-                ...thread,
-                messages: thread.messages.map(message =>
-                  message.id === stream.messageId
-                    ? { ...message, text }
-                    : message
-                ),
-              }
-            : thread
-        )
-      );
-      if (cursor === stream.text.length) {
-        clearInterval(timer);
-        generating.current = false;
-        setStream(null);
-      }
-    }, 22);
-    return () => clearInterval(timer);
-  }, [stream]);
+  useEffect(() => () => {
+    requestRef.current?.controller.abort();
+    requestRef.current = null;
+  }, []);
 
   function stop() {
-    if (stream)
-      setThreads(prev =>
-        prev.map(thread =>
-          thread.id === stream.threadId
-            ? {
-                ...thread,
-                messages: thread.messages.map(message =>
-                  message.id === stream.messageId
-                    ? { ...message, stopped: true }
-                    : message
-                ),
-              }
-            : thread
-        )
-      );
-    generating.current = false;
-    setStream(null);
+    const request = requestRef.current;
+    if (!request) return;
+    requestRef.current = null;
+    request.controller.abort();
+    setPending(null);
+    setThreads(prev => prev.map(thread => thread.id === request.threadId ? {
+      ...thread,
+      messages: thread.messages.map(message => message.id === request.messageId
+        ? { ...message, stopped: true } : message),
+    } : thread));
   }
   function switchThread(id: string) {
     stop();
@@ -203,53 +128,44 @@ function ChatApp() {
       composerRef.current?.querySelector("textarea")?.focus()
     );
   }
-  function submit() {
-    if (!validPrompt(input) || generating.current) return;
-    generating.current = true;
-    const text = input.trim();
+  async function submit() {
+    if (!validPrompt(input) || requestRef.current) return;
+    const text = input;
     const messageId = crypto.randomUUID();
-    const response = createDemoAnswer(text);
-    setThreads(prev =>
-      prev.map(thread =>
-        thread.id === activeId
-          ? {
-              ...thread,
-              title: thread.messages.length ? thread.title : text.slice(0, 38),
-              messages: [
-                ...thread.messages,
-                {
-                  id: crypto.randomUUID(),
-                  role: "user",
-                  text,
-                },
-                { id: messageId, role: "assistant", text: "" },
-              ],
-            }
-          : thread
-      )
-    );
+    const request = { threadId: activeId, messageId, controller: new AbortController() };
+    requestRef.current = request;
+    setPending(request);
+    setThreads(prev => prev.map(thread => thread.id === request.threadId ? {
+      ...thread,
+      title: thread.messages.length ? thread.title : text.trim().slice(0, 38),
+      messages: [...thread.messages,
+        { id: crypto.randomUUID(), role: "user", text },
+        { id: messageId, role: "assistant", text: "" }],
+    } : thread));
     setInput("");
-    setStream({ threadId: activeId, messageId, text: response });
-  }
-  function updateFeedback(id: string, feedback: "up" | "down") {
-    setThreads(prev =>
-      prev.map(thread =>
-        thread.id === activeId
-          ? {
-              ...thread,
-              messages: thread.messages.map(message =>
-                message.id === id
-                  ? {
-                      ...message,
-                      feedback:
-                        message.feedback === feedback ? undefined : feedback,
-                    }
-                  : message
-              ),
-            }
-          : thread
-      )
-    );
+    try {
+      const result = await sendQuery(text, request.controller.signal);
+      if (requestRef.current !== request || request.controller.signal.aborted) return;
+      setThreads(prev => prev.map(thread => thread.id === request.threadId ? {
+        ...thread,
+        messages: thread.messages.map(message => message.id === request.messageId
+          ? { ...message, text: result.answer?.replace(/^\s*assistant\s*:\s*/i, "") ?? "No answer returned.", result } : message),
+      } : thread));
+    } catch (error) {
+      if (requestRef.current !== request || request.controller.signal.aborted) return;
+      setThreads(prev => prev.map(thread => thread.id === request.threadId ? {
+        ...thread,
+        messages: thread.messages.map(message => message.id === request.messageId
+          ? { ...message, text: error instanceof Error ? error.message : "The request failed. Please try again.", error: true }
+          : message),
+      } : thread));
+    } finally {
+      // An old response must never clear a newer request's loading state.
+      if (requestRef.current === request) {
+        requestRef.current = null;
+        setPending(null);
+      }
+    }
   }
   async function copy(text: string) {
     try {
@@ -265,7 +181,7 @@ function ChatApp() {
         key={activeId}
         value={input}
         onValueChange={setInput}
-        isLoading={!!stream}
+        isLoading={!!pending}
         onSubmit={submit}
         className="w-full max-w-(--breakpoint-md)"
       >
@@ -273,22 +189,22 @@ function ChatApp() {
           className="dark:bg-transparent"
           placeholder="Ask me anything..."
           aria-label="Ask your knowledge"
-          disabled={!!stream}
+          disabled={!!pending}
         />
         <PromptInputActions className="justify-end pt-2">
           <PromptInputAction
-            tooltip={stream ? "Stop generation" : "Send message"}
+            tooltip={pending ? "Cancel waiting" : "Send message"}
           >
             <Button
               type="button"
               variant="default"
               size="icon"
               className="h-8 w-8 rounded-full"
-              disabled={!stream && !validPrompt(input)}
-              aria-label={stream ? "Stop response" : "Send message"}
-              onClick={stream ? stop : submit}
+              disabled={!pending && !validPrompt(input)}
+              aria-label={pending ? "Cancel waiting" : "Send message"}
+              onClick={pending ? stop : submit}
             >
-              {stream ? (
+              {pending ? (
                 <Square className="size-5 fill-current" />
               ) : (
                 <ArrowUp className="size-5" />
@@ -387,14 +303,14 @@ function ChatApp() {
           <div className="transcript">
             <MessageScrollerProvider
               key={activeId}
-              autoScroll={!!stream}
+              autoScroll={!!pending}
               defaultScrollPosition="start"
             >
               <MessageScroller className="h-full">
                 <MessageScrollerViewport>
                   <MessageScrollerContent
                     className="transcript-content"
-                    aria-busy={!!stream}
+                    aria-busy={!!pending}
                   >
                     {active.messages.length === 0 && (
                       <div className="empty-chat">
@@ -424,7 +340,7 @@ function ChatApp() {
                             <div className="bot-avatar">
                               <BotAvatar
                                 type="clover"
-                                paused={stream?.messageId !== message.id}
+                                paused={pending?.messageId !== message.id}
                                 size={32}
                                 theme={dark ? "dark" : "light"}
                                 interactive={false}
@@ -433,32 +349,39 @@ function ChatApp() {
                               />
                             </div>
                             <div className="assistant-body">
+                              {(message.error || message.result?.status === "error") && <p role="alert">Request failed</p>}
+                              {message.result?.status === "blocked" && <p role="status">Request refused</p>}
                               {message.text ? (
                                 <MessageResponse
-                                  isAnimating={stream?.messageId === message.id}
+                                  isAnimating={false}
                                 >
                                   {message.text}
                                 </MessageResponse>
                               ) : message.stopped ? (
-                                <p>No response generated.</p>
-                              ) : null}
-                              {stream?.messageId !== message.id &&
-                                message.text && (
+                                <p>Waiting cancelled.</p>
+                              ) : pending?.messageId === message.id ? <p role="status">Thinking...</p> : null}
+                              {message.result && (
+                                <p className="text-xs text-muted-foreground mt-2">
+                                  Route: {message.result.route ?? "unavailable"} · Jev: {message.result.jev_decision_ms === null ? "N/A" : `${message.result.jev_decision_ms.toFixed(0)} ms`} · Total: {message.result.total_request_ms.toFixed(0)} ms
+                                </p>
+                              )}
+                              {message.result?.status === "ok" && message.result.route === "RAG" &&
+                                message.result.contexts.length > 0 && (
                                   <div
                                     className="citations"
                                     aria-label="Answer sources"
                                   >
                                     <span>Sources</span>
-                                    {documents.map((doc, i) => (
-                                      <Source key={doc.id}>
+                                    {message.result.contexts.map((chunk, i) => (
+                                      <Source key={chunk.chunk_id}>
                                         <SourceTrigger
                                           label={i + 1}
-                                          title={doc.name}
+                                          title={`Chunk ${chunk.chunk_id}`}
                                         />
                                         <SourceContent
-                                          title={doc.name}
-                                          description={doc.excerpt}
-                                          page={doc.page}
+                                          title={`Chunk ${chunk.chunk_id}`}
+                                          description={chunk.content}
+                                          chunkId={chunk.chunk_id}
                                         />
                                       </Source>
                                     ))}
@@ -466,10 +389,10 @@ function ChatApp() {
                                 )}
                               {message.stopped && (
                                 <p className="stopped-label">
-                                  Response stopped
+                                  Browser waiting cancelled; server processing may continue.
                                 </p>
                               )}
-                              <div
+                              {message.result?.status === "ok" && <div
                                 className={`message-actions ${index === active.messages.length - 1 ? "last-actions" : ""}`}
                               >
                                 <MessageAction
@@ -479,37 +402,7 @@ function ChatApp() {
                                 >
                                   <Copy className="size-4" />
                                 </MessageAction>
-                                <MessageAction
-                                  tooltip="Upvote"
-                                  label="Helpful answer"
-                                  aria-pressed={message.feedback === "up"}
-                                  onClick={() =>
-                                    updateFeedback(message.id, "up")
-                                  }
-                                  className={
-                                    message.feedback === "up"
-                                      ? "feedback-selected"
-                                      : ""
-                                  }
-                                >
-                                  <ThumbsUp className="size-4" />
-                                </MessageAction>
-                                <MessageAction
-                                  tooltip="Downvote"
-                                  label="Unhelpful answer"
-                                  aria-pressed={message.feedback === "down"}
-                                  onClick={() =>
-                                    updateFeedback(message.id, "down")
-                                  }
-                                  className={
-                                    message.feedback === "down"
-                                      ? "feedback-selected"
-                                      : ""
-                                  }
-                                >
-                                  <ThumbsDown className="size-4" />
-                                </MessageAction>
-                              </div>
+                              </div>}
                             </div>
                           </div>
                         )}

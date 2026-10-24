@@ -82,17 +82,22 @@ class QueryRewriter:
             rewritten = _clean_rewritten_query(str(resp))
 
             if not rewritten:
-                log.warning("query rewrite returned empty, using original: %r", query[:80])
+                log.warning(
+                    "query rewrite status=empty-response, using original (%.0f ms)",
+                    (time.perf_counter() - t) * 1000.0,
+                )
                 return query
 
             log.info(
-                "query rewrite: %r -> %r (%.0f ms)",
-                query[:80], rewritten[:80],
+                "query rewrite status=ok (%.0f ms)",
                 (time.perf_counter() - t) * 1000.0,
             )
             return rewritten
-        except Exception as exc:
-            log.warning("query rewrite failed, using original: %s", exc)
+        except Exception:
+            log.warning(
+                "query rewrite status=llm-error, using original (%.0f ms)",
+                (time.perf_counter() - t) * 1000.0,
+            )
             return query
 
 
